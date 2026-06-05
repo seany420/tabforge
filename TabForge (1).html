@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TabForge — Guitar Tab Editor</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:system-ui,sans-serif;background:#0f0f0f;color:#e0e0e0;min-height:100vh}
+button{background:#1e1e1e;color:#ccc;border:1px solid #333;border-radius:5px;cursor:pointer;font-family:inherit}
+button:hover{background:#2a2a2a;color:#fff}
+input,select,textarea{background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:4px;padding:4px 8px;font-family:inherit;font-size:13px;width:100%}
+select option{background:#1a1a1a}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#111}
+::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+.active-btn{background:#1a3a2a!important;color:#4ade80!important;border-color:#4ade80!important}
+.cell{height:26px;display:inline-flex;align-items:center;justify-content:center;font-family:monospace;font-size:12px;cursor:pointer;border-radius:3px;border:1px solid transparent;user-select:none;transition:all .1s;padding:0 3px;min-width:28px}
+.cell:hover{background:#222;border-color:#444}
+.cell.selected{background:#1a2a3a;border-color:#60a5fa;color:#60a5fa}
+.cell.has-value{color:#e0e0e0}
+.cell.empty{color:#333}
+.bar-wrap{background:#171717;border:1px solid #2a2a2a;border-radius:8px;padding:10px 8px 8px;margin-bottom:14px}
+.bar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;flex-wrap:wrap}
+.str-row{display:flex;align-items:center;margin-bottom:1px}
+.str-label{width:22px;font-size:11px;color:#555;font-family:monospace;text-align:right;margin-right:5px;flex-shrink:0}
+.bar-line{font-family:monospace;color:#444;font-size:13px;padding:0 2px;flex-shrink:0}
+.tech-btn{font-family:monospace;font-size:12px;padding:3px 7px;border-radius:4px;margin:2px}
+.tab-display{font-family:monospace;font-size:12px;line-height:2;white-space:pre;background:#111;padding:16px;border-radius:8px;border:1px solid #222;overflow-x:auto}
+.section-btn{padding:5px 14px;font-size:13px;border-radius:6px;margin-right:4px}
+.sidebar-label{font-size:10px;color:#555;display:block;margin-bottom:3px;margin-top:10px;letter-spacing:.08em}
+.mic-note{font-size:32px;font-family:monospace;font-weight:600;color:#4ade80}
+.mic-fret{font-size:48px;font-family:monospace;font-weight:700;color:#60a5fa}
+.legend-card{background:#171717;border:1px solid #2a2a2a;border-radius:8px;padding:14px;margin-bottom:12px}
+.legend-row{display:flex;gap:12px;margin-bottom:5px;font-size:12px}
+code{font-family:monospace;color:#60a5fa;min-width:60px;display:inline-block}
+.beat-count-btn{font-size:11px;padding:2px 7px;border-radius:3px;font-family:monospace}
+.save-row{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:6px;background:#171717;border:1px solid #222;margin-bottom:6px;cursor:pointer;transition:background .1s}
+.save-row:hover{background:#1e1e1e;border-color:#333}
+.save-row.active-save{border-color:#60a5fa;background:#0d1a27}
+.toast{position:fixed;bottom:20px;right:20px;background:#111;border-radius:7px;padding:10px 18px;font-size:13px;z-index:999;pointer-events:none;transition:opacity .3s}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center}
+.modal{background:#141414;border:1px solid #333;border-radius:10px;padding:22px;width:340px;max-width:94vw}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+
+const STORAGE_KEY="tabforge_saves_v1";
+const AUTOSAVE_KEY="tabforge_autosave_v1";
+
+const TUNINGS={
+  "Standard (EADGBe)":["E2","A2","D3","G3","B3","E4"],
+  "Drop D (DADGBe)":["D2","A2","D3","G3","B3","E4"],
+  "Open G (DGDGBd)":["D2","G2","D3","G3","B3","D4"],
+  "Open D (DADf#Ad)":["D2","A2","D3","F#3","A3","D4"],
+  "DADGAD":["D2","A2","D3","G3","A3","D4"],
+  "Half Step Down (Eb)":["Eb2","Ab2","Db3","Gb3","Bb3","Eb4"],
+  "Full Step Down (D)":["D2","G2","C3","F3","A3","D4"],
+  "Open E (EBE G#Be)":["E2","B2","E3","G#3","B3","E4"],
+  "Custom":["E2","A2","D3","G3","B3","E4"],
+};
+const KEYS=["C","C#/Db","D","D#/Eb","E","F","F#/Gb","G","G#/Ab","A","A#/Bb","B"];
+const TIME_SIGS=["2/4","3/4","4/4","5/4","6/4","6/8","7/8","9/8","12/8"];
+const NOTE_NAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const NOTE_FREQS={"E2":82.41,"A2":110.00,"D3":146.83,"G3":196.00,"B3":246.94,"E4":329.63,"D2":73.42,"G2":98.00,"C3":130.81,"F3":174.61,"A3":220.00,"D4":293.66,"Eb2":77.78,"Ab2":103.83,"Db3":138.59,"Gb3":185.00,"Bb3":233.08,"F#3":185.00,"G#3":207.65};
+
+const TECHNIQUES=[
+  {key:"h",label:"h",title:"Hammer-on",desc:"5h7"},{key:"p",label:"p",title:"Pull-off",desc:"7p5"},
+  {key:"b",label:"b",title:"Bend",desc:"7b9"},{key:"r",label:"r",title:"Bend Release",desc:"7b9r7"},
+  {key:"/",label:"/",title:"Slide Up",desc:"5/7"},{key:"\\",label:"\\",title:"Slide Down",desc:"7\\5"},
+  {key:"~",label:"~",title:"Vibrato",desc:"7~"},{key:"t",label:"t",title:"Tap",desc:"t12"},
+  {key:"x",label:"x",title:"Mute",desc:"x"},{key:"<>",label:"◇",title:"Natural Harmonic",desc:"<12>"},
+  {key:"{}",label:"{}",title:"Pinch Harmonic",desc:"{7}"},{key:"()",label:"()",title:"Ghost Note",desc:"(5)"},
+  {key:"PM",label:"PM",title:"Palm Mute",desc:"PM--"},{key:"n",label:"tr",title:"Trill",desc:"5n7"},
+];
+const PICKING=[{sym:"↓",label:"Down"},{sym:"↑",label:"Up"},{sym:"⌇",label:"Rake"},{sym:"≈",label:"Tremolo"}];
+const EMPTY="-";
+const STRINGS=6;
+
+function makeBar(beats){
+  return{beats:beats||8,strings:Array.from({length:STRINGS},()=>Array(beats||8).fill(EMPTY))};
+}
+function freshTab(){
+  return{title:"Untitled Tab",artist:"",key:"E",tuning:"Standard (EADGBe)",timeSig:"4/4",tempo:120,bars:[makeBar(8)]};
+}
+function freqToNote(freq){
+  if(!freq||freq<40)return null;
+  const midi=Math.round(12*Math.log2(freq/440)+69);
+  return`${NOTE_NAMES[((midi%12)+12)%12]}${Math.floor(midi/12)-1}`;
+}
+function freqToFret(freq,openFreq){
+  if(!freq||!openFreq)return null;
+  const st=Math.round(12*Math.log2(freq/openFreq));
+  return(st>=0&&st<=24)?st:null;
+}
+function autocorrelate(buf,sr){
+  let rms=0;for(let i=0;i<buf.length;i++)rms+=buf[i]*buf[i];rms=Math.sqrt(rms/buf.length);
+  if(rms<0.01)return -1;
+  let r1=0,r2=buf.length-1;
+  for(let i=0;i<buf.length/2;i++){if(Math.abs(buf[i])<0.2){r1=i;break;}}
+  for(let i=1;i<buf.length/2;i++){if(Math.abs(buf[buf.length-i])<0.2){r2=buf.length-i;break;}}
+  const tb=buf.slice(r1,r2);const c=new Array(tb.length).fill(0);
+  for(let i=0;i<tb.length;i++)for(let j=0;j<tb.length-i;j++)c[i]+=tb[j]*tb[j+i];
+  let d=0;while(c[d]>c[d+1])d++;
+  let mx=-1,mp=-1;for(let i=d;i<tb.length;i++)if(c[i]>mx){mx=c[i];mp=i;}
+  let T0=mp;const x1=c[T0-1],x2=c[T0],x3=c[T0+1];
+  if(x1!==undefined&&x3!==undefined)T0=T0+(x3-x1)/(2*(2*x2-x3-x1));
+  return sr/T0;
+}
+function loadSaves(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]");}catch{return[];}}
+function writeSaves(saves){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(saves));}catch(e){console.warn("Storage full",e);}}
+function loadAutosave(){try{const d=localStorage.getItem(AUTOSAVE_KEY);return d?JSON.parse(d):null;}catch{return null;}}
+function writeAutosave(tab){try{localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({tab,ts:Date.now()}));}catch{}}
+function fmtDate(ts){
+  if(!ts)return"";
+  const d=new Date(ts);
+  return d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})+" "+d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
+}
+
+function App(){
+  const autosave=loadAutosave();
+  const [tab,setTab]=useState(autosave?.tab||freshTab());
+  const [currentSaveId,setCurrentSaveId]=useState(null);
+  const [saves,setSaves]=useState(loadSaves);
+  const [sel,setSel]=useState({bar:0,str:0,beat:0});
+  const [section,setSection]=useState("editor");
+  const [micActive,setMicActive]=useState(false);
+  const [detNote,setDetNote]=useState(null);
+  const [detFret,setDetFret]=useState(null);
+  const [micStatus,setMicStatus]=useState("idle");
+  const [selStr,setSelStr]=useState(0);
+  const [customTuning,setCustomTuning]=useState([...TUNINGS["Standard (EADGBe)"]]);
+  const [sideOpen,setSideOpen]=useState(true);
+  const [newBarBeats,setNewBarBeats]=useState(8);
+  const [toast,setToast]=useState(null);
+  const [showSavePanel,setShowSavePanel]=useState(false);
+  const [confirmDelete,setConfirmDelete]=useState(null);
+  const [renameId,setRenameId]=useState(null);
+  const [renameName,setRenameName]=useState("");
+  const [unsaved,setUnsaved]=useState(false);
+
+  const audioCtxRef=useRef(null);
+  const analyserRef=useRef(null);
+  const micStreamRef=useRef(null);
+  const rafRef=useRef(null);
+  const autosaveTimer=useRef(null);
+
+  const tuning=tab.tuning==="Custom"?customTuning:TUNINGS[tab.tuning];
+
+  useEffect(()=>{
+    setUnsaved(true);
+    clearTimeout(autosaveTimer.current);
+    autosaveTimer.current=setTimeout(()=>{writeAutosave(tab);},1500);
+    return()=>clearTimeout(autosaveTimer.current);
+  },[tab]);
+
+  const showToast=(msg,color="#4ade80",border="#4ade80")=>{
+    setToast({msg,color,border});setTimeout(()=>setToast(null),2200);
+  };
+
+  const saveTab=(overwriteId=null)=>{
+    const id=overwriteId||`save_${Date.now()}`;
+    const entry={id,name:tab.title||"Untitled",tab:JSON.parse(JSON.stringify(tab)),ts:Date.now()};
+    setSaves(prev=>{const filtered=prev.filter(s=>s.id!==id);const next=[entry,...filtered];writeSaves(next);return next;});
+    setCurrentSaveId(id);setUnsaved(false);showToast(`✓ Saved "${entry.name}"`);
+  };
+
+  const loadTab=(entry)=>{
+    setTab(JSON.parse(JSON.stringify(entry.tab)));setCurrentSaveId(entry.id);setUnsaved(false);
+    setSel({bar:0,str:0,beat:0});showToast(`Loaded "${entry.name}"`,"#60a5fa","#60a5fa");setShowSavePanel(false);
+  };
+
+  const deleteTab=(id)=>{
+    setSaves(prev=>{const next=prev.filter(s=>s.id!==id);writeSaves(next);return next;});
+    if(currentSaveId===id)setCurrentSaveId(null);setConfirmDelete(null);showToast("Deleted","#f87171","#f87171");
+  };
+
+  const newTab=()=>{setTab(freshTab());setCurrentSaveId(null);setUnsaved(false);setSel({bar:0,str:0,beat:0});setShowSavePanel(false);showToast("New tab started","#a78bfa","#a78bfa");};
+
+  const exportJson=()=>{
+    const blob=new Blob([JSON.stringify(tab,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);const a=document.createElement("a");
+    a.href=url;a.download=`${tab.title||"tab"}.tabforge.json`;a.click();URL.revokeObjectURL(url);showToast("Exported .json");
+  };
+
+  const importJson=(e)=>{
+    const file=e.target.files?.[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const data=JSON.parse(ev.target.result);
+        if(data.bars&&data.title!==undefined){setTab(data);setCurrentSaveId(null);setUnsaved(true);showToast(`Imported "${data.title}"`,"#a78bfa","#a78bfa");setShowSavePanel(false);}
+        else showToast("Invalid file","#f87171","#f87171");
+      }catch{showToast("Couldn't read file","#f87171","#f87171");}
+    };reader.readAsText(file);e.target.value="";
+  };
+
+  const startRename=(s)=>{setRenameId(s.id);setRenameName(s.name);};
+  const commitRename=()=>{
+    setSaves(prev=>{const next=prev.map(s=>s.id===renameId?{...s,name:renameName}:s);writeSaves(next);return next;});setRenameId(null);
+  };
+
+  const resizeBar=(barIdx,newBeats)=>{
+    if(newBeats<1||newBeats>64)return;
+    setTab(prev=>{
+      const bars=prev.bars.map((bar,bi)=>{
+        if(bi!==barIdx)return bar;
+        const strings=bar.strings.map(str=>newBeats>str.length?[...str,...Array(newBeats-str.length).fill(EMPTY)]:str.slice(0,newBeats));
+        return{...bar,beats:newBeats,strings};
+      });return{...prev,bars};
+    });
+    setSel(s=>s.bar===barIdx&&s.beat>=newBeats?{...s,beat:newBeats-1}:s);
+  };
+
+  const updateCell=useCallback((bar,str,beat,val)=>{
+    setTab(prev=>{
+      const bars=prev.bars.map((b,bi)=>bi!==bar?b:{...b,strings:b.strings.map((s,si)=>si!==str?s:s.map((c,bi2)=>bi2===beat?val:c))});
+      return{...prev,bars};
+    });
+  },[]);
+
+  const addBar=()=>setTab(p=>({...p,bars:[...p.bars,makeBar(newBarBeats)]}));
+  const removeBar=idx=>{if(tab.bars.length<=1)return;setTab(p=>({...p,bars:p.bars.filter((_,i)=>i!==idx)}));};
+  const autoExtendBar=barIdx=>{
+    setTab(prev=>{
+      const bar=prev.bars[barIdx];const newBeats=bar.beats+4;
+      const bars=prev.bars.map((b,bi)=>bi!==barIdx?b:{...b,beats:newBeats,strings:b.strings.map(str=>[...str,...Array(4).fill(EMPTY)])});
+      return{...prev,bars};
+    });
+  };
+
+  useEffect(()=>{
+    if(section!=="editor")return;
+    const handle=e=>{
+      if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT"||e.target.tagName==="TEXTAREA")return;
+      const{bar,str,beat}=sel;const barBeats=tab.bars[bar]?.beats||8;
+      if(e.key==="ArrowRight"){e.preventDefault();if(beat<barBeats-1)setSel(s=>({...s,beat:s.beat+1}));else if(bar<tab.bars.length-1)setSel(s=>({bar:s.bar+1,str:s.str,beat:0}));else{autoExtendBar(bar);setSel(s=>({...s,beat:s.beat+1}));}}
+      else if(e.key==="ArrowLeft"){e.preventDefault();if(beat>0)setSel(s=>({...s,beat:s.beat-1}));else if(bar>0)setSel(s=>({bar:s.bar-1,str:s.str,beat:tab.bars[s.bar-1]?.beats-1||7}));}
+      else if(e.key==="ArrowUp"){e.preventDefault();setSel(s=>({...s,str:Math.max(0,s.str-1)}));}
+      else if(e.key==="ArrowDown"){e.preventDefault();setSel(s=>({...s,str:Math.min(STRINGS-1,s.str+1)}));}
+      else if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();updateCell(bar,str,beat,EMPTY);}
+      else if(/^[0-9]$/.test(e.key)){const cur=tab.bars[bar]?.strings[str]?.[beat]??EMPTY;updateCell(bar,str,beat,cur!==EMPTY&&/^\d+$/.test(cur)&&cur.length<2?cur+e.key:e.key);}
+      else if("hpbr/\\~txn".includes(e.key)&&e.key.length===1){const cur=tab.bars[bar]?.strings[str]?.[beat]??EMPTY;if(cur!==EMPTY)updateCell(bar,str,beat,cur+e.key);}
+      else if((e.ctrlKey||e.metaKey)&&e.key==="s"){e.preventDefault();saveTab(currentSaveId);}
+    };
+    window.addEventListener("keydown",handle);return()=>window.removeEventListener("keydown",handle);
+  },[section,sel,tab.bars,updateCell,currentSaveId]);
+
+  const startMic=async()=>{
+    try{
+      setMicStatus("requesting");
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+      micStreamRef.current=stream;
+      const ctx=new(window.AudioContext||window.webkitAudioContext)();audioCtxRef.current=ctx;
+      const analyser=ctx.createAnalyser();analyser.fftSize=2048;analyserRef.current=analyser;
+      ctx.createMediaStreamSource(stream).connect(analyser);setMicActive(true);setMicStatus("active");
+      const buf=new Float32Array(2048);
+      const detect=()=>{
+        analyser.getFloatTimeDomainData(buf);const freq=autocorrelate(buf,ctx.sampleRate);
+        if(freq>0){setDetNote(freqToNote(freq)?`${freqToNote(freq)} · ${Math.round(freq)}Hz`:null);const of=NOTE_FREQS[tuning[selStr]];if(of)setDetFret(freqToFret(freq,of));}
+        rafRef.current=requestAnimationFrame(detect);
+      };detect();
+    }catch{setMicStatus("denied");setMicActive(false);}
+  };
+  const stopMic=()=>{
+    if(rafRef.current)cancelAnimationFrame(rafRef.current);
+    if(micStreamRef.current)micStreamRef.current.getTracks().forEach(t=>t.stop());
+    if(audioCtxRef.current)audioCtxRef.current.close();
+    setMicActive(false);setMicStatus("idle");setDetNote(null);setDetFret(null);
+  };
+  const applyFret=()=>{if(detFret===null)return;updateCell(sel.bar,sel.str,sel.beat,String(detFret));};
+  const applyTech=tk=>{
+    const{bar,str,beat}=sel;const cur=tab.bars[bar]?.strings[str]?.[beat]??EMPTY;
+    if(tk==="<>")updateCell(bar,str,beat,cur!==EMPTY?`<${cur}>`:cur);
+    else if(tk==="{}")updateCell(bar,str,beat,cur!==EMPTY?`{${cur}}`:cur);
+    else if(tk==="()")updateCell(bar,str,beat,cur!==EMPTY?`(${cur})`:cur);
+    else if(tk==="PM")updateCell(bar,str,beat,"PM");
+    else updateCell(bar,str,beat,cur!==EMPTY?cur+tk:tk);
+  };
+
+  const tabText=()=>{
+    const L=[];
+    L.push(`${tab.title}${tab.artist?" — "+tab.artist:""}`);
+    L.push(`Key: ${tab.key} | ${tab.tuning} | ${tab.timeSig} | ♩=${tab.tempo}`);
+    L.push(`Tuning (low→high): ${tuning.join(" ")}`);L.push("");
+    tab.bars.forEach((bar,bi)=>{
+      L.push(`[Bar ${bi+1} — ${bar.beats} beats]`);
+      [...tuning].reverse().forEach((note,ri)=>{
+        const si=STRINGS-1-ri;const sn=note.replace(/\d/,"").padEnd(2);
+        L.push(`${sn}|${bar.strings[si].map(c=>c===EMPTY?"--":c.toString().padEnd(2,"-")).join("-")}|`);
+      });L.push("");
+    });return L.join("\n");
+  };
+  const exportTxt=()=>{
+    const blob=new Blob([tabText()],{type:"text/plain"});const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download=`${tab.title||"tab"}.txt`;a.click();URL.revokeObjectURL(url);
+  };
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"100vh",background:"#0f0f0f",overflow:"hidden"}}>
+
+      {toast&&<div className="toast" style={{color:toast.color,borderColor:toast.border,border:"1px solid"}}>{toast.msg}</div>}
+
+      {confirmDelete&&(
+        <div className="modal-overlay" onClick={()=>setConfirmDelete(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div style={{fontWeight:600,fontSize:15,marginBottom:8,color:"#f87171"}}>Delete this tab?</div>
+            <div style={{fontSize:13,color:"#888",marginBottom:18}}>"{confirmDelete.name}" will be permanently removed.</div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setConfirmDelete(null)} style={{padding:"6px 16px",fontSize:13}}>Cancel</button>
+              <button onClick={()=>deleteTab(confirmDelete.id)} style={{padding:"6px 16px",fontSize:13,color:"#f87171",borderColor:"#f87171",background:"#1a0f0f"}}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top bar */}
+      <div style={{background:"#141414",borderBottom:"1px solid #222",padding:"8px 12px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",flexShrink:0}}>
+        <span style={{fontSize:18}}>🎸</span>
+        <span style={{fontWeight:600,fontSize:15,color:"#fff",marginRight:4}}>TabForge</span>
+        {unsaved&&<span style={{fontSize:10,color:"#888",background:"#1e1e1e",padding:"1px 6px",borderRadius:3}}>unsaved</span>}
+        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+          {["editor","preview","legend","mic"].map(s=>(
+            <button key={s} onClick={()=>setSection(s)} className={section===s?"section-btn active-btn":"section-btn"} style={{fontSize:12,padding:"4px 11px"}}>
+              {s==="mic"?"🎙 Mic":s.charAt(0).toUpperCase()+s.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div style={{marginLeft:"auto",display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+          <button onClick={()=>saveTab(currentSaveId)} style={{padding:"4px 12px",fontSize:12,background:"#1a3a2a",color:"#4ade80",border:"1px solid #4ade80",borderRadius:5}} title="Ctrl/Cmd+S">
+            💾 Save
+          </button>
+          <button onClick={()=>setShowSavePanel(v=>!v)} style={{padding:"4px 12px",fontSize:12,background:showSavePanel?"#1a2a3a":"#1e1e1e",color:showSavePanel?"#60a5fa":"#ccc",border:`1px solid ${showSavePanel?"#60a5fa":"#333"}`,borderRadius:5}}>
+            📂 My Tabs {saves.length>0&&<span style={{fontSize:10,marginLeft:3,background:"#333",padding:"0 4px",borderRadius:3}}>{saves.length}</span>}
+          </button>
+          <button onClick={()=>setSideOpen(o=>!o)} style={{fontSize:12,padding:"4px 10px"}}>{sideOpen?"◀":"▶"}</button>
+          <button onClick={exportTxt} style={{fontSize:12,padding:"4px 10px"}}>↓ txt</button>
+        </div>
+      </div>
+
+      {/* Save panel */}
+      {showSavePanel&&(
+        <div style={{background:"#111",borderBottom:"1px solid #222",padding:"14px 16px",maxHeight:300,overflowY:"auto",flexShrink:0}}>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
+            <span style={{fontWeight:600,fontSize:13,color:"#ccc"}}>Saved tabs</span>
+            <button onClick={newTab} style={{fontSize:12,padding:"3px 10px",color:"#a78bfa",borderColor:"#a78bfa",background:"#1a1525"}}>+ New tab</button>
+            <button onClick={exportJson} style={{fontSize:12,padding:"3px 10px"}}>↓ Export .json</button>
+            <label style={{fontSize:12,padding:"3px 10px",border:"1px solid #333",borderRadius:5,cursor:"pointer",background:"#1e1e1e",color:"#ccc"}}>
+              ↑ Import .json<input type="file" accept=".json" style={{display:"none"}} onChange={importJson}/>
+            </label>
+            <span style={{fontSize:11,color:"#444"}}>Auto-saves every 1.5s</span>
+          </div>
+          {saves.length===0&&<div style={{fontSize:13,color:"#444",padding:"10px 0"}}>No saves yet. Hit 💾 Save to store your tab.</div>}
+          {saves.map(s=>(
+            <div key={s.id} className={`save-row${currentSaveId===s.id?" active-save":""}`}>
+              {renameId===s.id?(
+                <div style={{display:"flex",gap:6,flex:1}} onClick={e=>e.stopPropagation()}>
+                  <input value={renameName} onChange={e=>setRenameName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")commitRename();if(e.key==="Escape")setRenameId(null);}} autoFocus style={{flex:1,fontSize:13}}/>
+                  <button onClick={commitRename} style={{fontSize:12,padding:"2px 8px",color:"#4ade80",borderColor:"#4ade80"}}>✓</button>
+                  <button onClick={()=>setRenameId(null)} style={{fontSize:12,padding:"2px 8px"}}>✕</button>
+                </div>
+              ):(
+                <>
+                  <div style={{flex:1,cursor:"pointer"}} onClick={()=>loadTab(s)}>
+                    <div style={{fontSize:13,color:"#ddd",fontWeight:currentSaveId===s.id?600:400}}>{s.name}</div>
+                    <div style={{fontSize:11,color:"#444",marginTop:2}}>{fmtDate(s.ts)} · {s.tab.bars.length} bar{s.tab.bars.length!==1?"s":""} · {s.tab.tuning}</div>
+                  </div>
+                  <div style={{display:"flex",gap:4}}>
+                    <button onClick={e=>{e.stopPropagation();saveTab(s.id);}} title="Overwrite with current" style={{fontSize:11,padding:"2px 8px"}}>↑</button>
+                    <button onClick={e=>{e.stopPropagation();startRename(s);}} style={{fontSize:11,padding:"2px 8px"}}>✎</button>
+                    <button onClick={e=>{e.stopPropagation();setConfirmDelete(s);}} style={{fontSize:11,padding:"2px 8px",color:"#f87171"}}>🗑</button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+        {/* Sidebar */}
+        {sideOpen&&(
+          <div style={{width:196,background:"#141414",borderRight:"1px solid #222",padding:"10px 12px",overflowY:"auto",flexShrink:0}}>
+            <span className="sidebar-label">TITLE</span>
+            <input value={tab.title} onChange={e=>setTab(p=>({...p,title:e.target.value}))} style={{marginBottom:4}}/>
+            <span className="sidebar-label">ARTIST</span>
+            <input value={tab.artist} onChange={e=>setTab(p=>({...p,artist:e.target.value}))} placeholder="Artist name" style={{marginBottom:4}}/>
+            <span className="sidebar-label">KEY</span>
+            <select value={tab.key} onChange={e=>setTab(p=>({...p,key:e.target.value}))} style={{marginBottom:4}}>{KEYS.map(k=><option key={k}>{k}</option>)}</select>
+            <span className="sidebar-label">TUNING</span>
+            <select value={tab.tuning} onChange={e=>setTab(p=>({...p,tuning:e.target.value}))} style={{marginBottom:4}}>{Object.keys(TUNINGS).map(t=><option key={t}>{t}</option>)}</select>
+            {tab.tuning==="Custom"&&(
+              <div style={{marginBottom:6}}>
+                <span className="sidebar-label">CUSTOM (low→high)</span>
+                {customTuning.map((n,i)=><input key={i} value={n} onChange={e=>{const t=[...customTuning];t[i]=e.target.value;setCustomTuning(t);}} style={{marginBottom:2,fontSize:12}}/>)}
+              </div>
+            )}
+            <span className="sidebar-label">TIME SIG</span>
+            <select value={tab.timeSig} onChange={e=>setTab(p=>({...p,timeSig:e.target.value}))} style={{marginBottom:4}}>{TIME_SIGS.map(t=><option key={t}>{t}</option>)}</select>
+            <span className="sidebar-label">TEMPO: {tab.tempo} BPM</span>
+            <input type="range" min={40} max={280} step={1} value={tab.tempo} onChange={e=>setTab(p=>({...p,tempo:Number(e.target.value)}))} style={{marginBottom:8,background:"transparent",width:"100%"}}/>
+            <hr style={{border:"none",borderTop:"1px solid #222",margin:"10px 0"}}/>
+            <span className="sidebar-label">NEW BAR SIZE</span>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+              <button onClick={()=>setNewBarBeats(b=>Math.max(1,b-1))} style={{padding:"2px 8px",fontSize:14}}>−</button>
+              <span style={{fontFamily:"monospace",fontSize:14,color:"#ccc",minWidth:28,textAlign:"center"}}>{newBarBeats}</span>
+              <button onClick={()=>setNewBarBeats(b=>Math.min(64,b+1))} style={{padding:"2px 8px",fontSize:14}}>+</button>
+            </div>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
+              {[4,6,8,12,16].map(n=><button key={n} onClick={()=>setNewBarBeats(n)} style={{fontSize:11,padding:"2px 7px",background:newBarBeats===n?"#1a3a2a":"#1e1e1e",color:newBarBeats===n?"#4ade80":"#888",borderColor:newBarBeats===n?"#4ade80":"#333"}}>{n}</button>)}
+            </div>
+            <button onClick={addBar} style={{width:"100%",padding:"7px",fontSize:12,marginBottom:4}}>+ Add Bar ({newBarBeats})</button>
+            <hr style={{border:"none",borderTop:"1px solid #222",margin:"10px 0"}}/>
+            <button onClick={()=>saveTab(currentSaveId)} style={{width:"100%",padding:"7px",fontSize:12,background:"#1a3a2a",color:"#4ade80",border:"1px solid #4ade80",borderRadius:5,marginBottom:4}}>💾 Save</button>
+            <button onClick={()=>setShowSavePanel(v=>!v)} style={{width:"100%",padding:"7px",fontSize:12}}>📂 My Tabs ({saves.length})</button>
+            <div style={{fontSize:11,color:"#444",marginTop:8}}>Bars: {tab.bars.length}</div>
+          </div>
+        )}
+
+        {/* Main */}
+        <div style={{flex:1,overflowY:"auto",padding:14}}>
+
+          {section==="editor"&&(
+            <div>
+              <div style={{background:"#141414",border:"1px solid #222",borderRadius:7,padding:"7px 10px",marginBottom:12,display:"flex",flexWrap:"wrap",alignItems:"center",gap:2}}>
+                <span style={{fontSize:10,color:"#444",marginRight:4,letterSpacing:".08em"}}>TECH</span>
+                {TECHNIQUES.map(t=><button key={t.key} title={`${t.title} (${t.desc})`} onClick={()=>applyTech(t.key)} className="tech-btn">{t.label}</button>)}
+                <span style={{fontSize:10,color:"#444",marginLeft:6,marginRight:4}}>PICK</span>
+                {PICKING.map(p=><button key={p.sym} title={p.label} onClick={()=>{const{bar,str,beat}=sel;const cur=tab.bars[bar]?.strings[str]?.[beat]??EMPTY;updateCell(bar,str,beat,cur!==EMPTY?cur+p.sym:p.sym);}} className="tech-btn" style={{fontSize:15}}>{p.sym}</button>)}
+              </div>
+              <div style={{fontSize:11,color:"#444",marginBottom:10}}>Click a cell → type fret # → toolbar or keys h p b r / \ ~ t x · Arrows navigate · Delete clears · Ctrl/Cmd+S saves</div>
+
+              {tab.bars.map((bar,bi)=>(
+                <div key={bi} className="bar-wrap">
+                  <div className="bar-header">
+                    <span style={{fontSize:10,color:"#555",fontFamily:"monospace",flexShrink:0}}>BAR {bi+1}</span>
+                    <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+                      <span style={{fontSize:10,color:"#444"}}>beats:</span>
+                      <button className="beat-count-btn" onClick={()=>resizeBar(bi,bar.beats-1)} style={{padding:"1px 6px"}}>−</button>
+                      <span style={{fontFamily:"monospace",fontSize:12,color:"#aaa",minWidth:22,textAlign:"center"}}>{bar.beats}</span>
+                      <button className="beat-count-btn" onClick={()=>resizeBar(bi,bar.beats+1)} style={{padding:"1px 6px"}}>+</button>
+                      <button className="beat-count-btn" onClick={()=>resizeBar(bi,bar.beats+4)} style={{padding:"1px 6px"}}>+4</button>
+                      {[4,8,12,16].map(n=><button key={n} className="beat-count-btn" onClick={()=>resizeBar(bi,n)} style={{background:bar.beats===n?"#1a3a2a":"#1a1a1a",color:bar.beats===n?"#4ade80":"#555",borderColor:bar.beats===n?"#4ade80":"#2a2a2a"}}>{n}</button>)}
+                      <button onClick={()=>removeBar(bi)} style={{fontSize:10,padding:"1px 7px",color:"#555",marginLeft:4}}>✕</button>
+                    </div>
+                  </div>
+                  <div style={{overflowX:"auto"}}>
+                    {[...Array(STRINGS)].map((_,rawSi)=>{
+                      const si=STRINGS-1-rawSi;const sn=(tuning[si]||"?").replace(/\d/,"");
+                      return(
+                        <div key={si} className="str-row" style={{flexWrap:"nowrap"}}>
+                          <span className="str-label">{sn}</span>
+                          <span className="bar-line">|</span>
+                          {bar.strings[si].map((cell,beat)=>{
+                            const isSel=sel.bar===bi&&sel.str===si&&sel.beat===beat;
+                            return<div key={beat} onClick={()=>setSel({bar:bi,str:si,beat})} className={`cell${isSel?" selected":cell===EMPTY?" empty":" has-value"}`} style={{minWidth:cell.length>2?cell.length*8+6:28}}>{cell}</div>;
+                          })}
+                          <span className="bar-line">|</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
+                <button onClick={addBar} style={{flex:1,padding:10,fontSize:13,border:"1px dashed #333",borderRadius:8,background:"transparent",color:"#555"}}>+ Add Bar ({newBarBeats} beats)</button>
+                <div style={{display:"flex",gap:4}}>
+                  {[4,8,12,16].map(n=><button key={n} onClick={()=>setNewBarBeats(n)} style={{fontSize:11,padding:"4px 8px",background:newBarBeats===n?"#1a3a2a":"#1a1a1a",color:newBarBeats===n?"#4ade80":"#666",borderColor:newBarBeats===n?"#4ade80":"#333"}}>{n}</button>)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {section==="preview"&&(
+            <div>
+              <div className="tab-display">{tabText()}</div>
+              <div style={{display:"flex",gap:8,marginTop:10}}>
+                <button onClick={()=>navigator.clipboard?.writeText(tabText())} style={{padding:"6px 14px",fontSize:12}}>Copy</button>
+                <button onClick={exportTxt} style={{padding:"6px 14px",fontSize:12}}>Download .txt</button>
+                <button onClick={exportJson} style={{padding:"6px 14px",fontSize:12}}>Download .json</button>
+              </div>
+            </div>
+          )}
+
+          {section==="legend"&&(
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12}}>
+              {[
+                {title:"Core notation",rows:[["0","Open string"],["1–24","Fret number"],["–","Empty beat"],["x","Muted note"],["|","Bar divider"]]},
+                {title:"Articulations",rows:[["h","Hammer-on (5h7)"],["p","Pull-off (7p5)"],["b","Bend (7b)"],["r","Release (7b9r7)"],["/ \\","Slide up/down"],["~","Vibrato"],["t","Tap"],["n","Trill"]]},
+                {title:"Harmonics & effects",rows:[["<12>","Natural harmonic"],["{}","Pinch harmonic"],["()","Ghost note"],["PM","Palm mute"],["TR","Tremolo pick"]]},
+                {title:"Picking",rows:[["↓","Downstroke"],["↑","Upstroke"],["⌇","Rake"],["≈","Tremolo"]]},
+              ].map((card,i)=>(
+                <div key={i} className="legend-card">
+                  <div style={{fontWeight:600,fontSize:13,marginBottom:10,color:"#ccc"}}>{card.title}</div>
+                  {card.rows.map(([sym,def])=><div key={sym} className="legend-row"><code>{sym}</code><span style={{color:"#888"}}>{def}</span></div>)}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {section==="mic"&&(
+            <div style={{maxWidth:480}}>
+              <div className="legend-card" style={{marginBottom:12}}>
+                <div style={{fontWeight:600,fontSize:14,color:"#ccc",marginBottom:8}}>Microphone pitch detection</div>
+                <div style={{fontSize:12,color:"#666",lineHeight:1.7,marginBottom:14}}>Play a single note. Uses autocorrelation to identify pitch and suggest a fret. Best with clean single notes.</div>
+                <div style={{marginBottom:12}}>
+                  <span style={{fontSize:11,color:"#555",display:"block",marginBottom:6}}>Detect on string:</span>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {[...tuning].reverse().map((note,ri)=>{const si=STRINGS-1-ri;return<button key={si} onClick={()=>setSelStr(si)} style={{padding:"4px 10px",fontSize:12,fontFamily:"monospace",background:selStr===si?"#1a3a2a":"#1e1e1e",color:selStr===si?"#4ade80":"#888",border:`1px solid ${selStr===si?"#4ade80":"#333"}`,borderRadius:4}}>{note.replace(/\d/,"")}</button>;})}
+                  </div>
+                </div>
+                {!micActive?<button onClick={startMic} style={{padding:"8px 18px",fontSize:13}}>🎙 Start listening</button>:<button onClick={stopMic} style={{padding:"8px 18px",fontSize:13,color:"#f87171",borderColor:"#f87171"}}>⬛ Stop</button>}
+                {micStatus==="denied"&&<div style={{marginTop:10,fontSize:12,color:"#f87171"}}>Mic access denied — check browser permissions.</div>}
+              </div>
+              {micActive&&(
+                <div className="legend-card">
+                  <div style={{marginBottom:14}}><div style={{fontSize:10,color:"#555",marginBottom:4}}>DETECTED NOTE</div><div className="mic-note">{detNote||"— listening —"}</div></div>
+                  <div style={{marginBottom:14}}><div style={{fontSize:10,color:"#555",marginBottom:4}}>SUGGESTED FRET · {(tuning[selStr]||"").replace(/\d/,"")} string</div><div className="mic-fret">{detFret!==null?detFret:"—"}</div></div>
+                  {detFret!==null&&<button onClick={applyFret} style={{padding:"8px 18px",fontSize:13,background:"#1a2a3a",color:"#60a5fa",border:"1px solid #60a5fa",borderRadius:6}}>↓ Apply fret {detFret}</button>}
+                  <div style={{marginTop:12,fontSize:11,color:"#444",lineHeight:1.6}}>Tip: Clean single notes, close to mic, let it ring.</div>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
