@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TabForge">
+<meta name="theme-color" content="#0f0f0f">
+<title>TabForge — Guitar Tab Editor</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#0f0f0f}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#e0e0e0;font-size:14px}
+button{background:#1e1e1e;color:#ccc;border:1px solid #333;border-radius:6px;cursor:pointer;font-family:inherit;font-size:13px;padding:6px 12px;-webkit-appearance:none;touch-action:manipulation}
+button:active{background:#2a2a2a}
+input,select{background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:6px;padding:7px 10px;font-family:inherit;font-size:16px;width:100%;-webkit-appearance:none}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0l6 8 6-8z' fill='%23666'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+#topbar{background:#141414;border-bottom:1px solid #222;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0}
+#topbar h1{font-size:16px;font-weight:700;color:#fff}
+.unsaved{font-size:10px;color:#888;background:#1e1e1e;padding:2px 7px;border-radius:3px}
+.nav-btns{display:flex;gap:4px;flex-wrap:wrap}
+.nbtn{padding:5px 11px;font-size:12px;border-radius:6px}
+.nbtn.on{background:#1a3a2a;color:#4ade80;border-color:#4ade80}
+.top-r{margin-left:auto;display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.sbtn{background:#1a3a2a;color:#4ade80;border-color:#4ade80;font-size:12px;padding:5px 11px}
+.tbtn{font-size:12px;padding:5px 10px}
+.tbtn.on{background:#1a2a3a;color:#60a5fa;border-color:#60a5fa}
+
+/* panels */
+#savepanel{background:#111;border-bottom:1px solid #222;padding:12px 14px;max-height:300px;overflow-y:auto;flex-shrink:0}
+.sptop{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.srow{display:flex;align-items:center;padding:10px;border-radius:7px;background:#171717;border:1px solid #222;margin-bottom:6px;gap:8px}
+.srow.cur{border-color:#60a5fa;background:#0d1a27}
+.sinfo{flex:1;min-width:0;cursor:pointer}
+.sname{font-size:13px;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smeta{font-size:10px;color:#444;margin-top:2px}
+.sacts{display:flex;gap:4px;flex-shrink:0}
+.sacts button{padding:4px 8px;font-size:11px}
+.renrow{display:flex;gap:6px;flex:1}
+.renrow input{flex:1;font-size:13px;padding:5px 8px}
+
+/* file panel */
+#filepanel{background:#0d1a10;border-bottom:2px solid #4ade80;padding:14px 16px;flex-shrink:0}
+#filepanel h3{font-size:13px;color:#4ade80;margin-bottom:10px;font-weight:600;letter-spacing:.05em}
+.file-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:10px}
+.file-card{background:#141414;border:1px solid #2a2a2a;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.file-card h4{font-size:11px;color:#666;letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px}
+.file-card p{font-size:11px;color:#555;line-height:1.5}
+.file-card button{font-size:12px;padding:7px;width:100%;text-align:center}
+.file-card .green{background:#1a3a2a;color:#4ade80;border-color:#4ade80}
+.file-card .blue{background:#1a2a3a;color:#60a5fa;border-color:#60a5fa}
+.file-card .purple{background:#1a1525;color:#a78bfa;border-color:#a78bfa}
+.file-note{font-size:11px;color:#444;line-height:1.6;padding-top:6px;border-top:1px solid #1a2a1a}
+
+/* body layout */
+#body{display:flex;flex:1;overflow:hidden}
+#sidebar{width:196px;background:#141414;border-right:1px solid #222;padding:10px 12px;overflow-y:auto;flex-shrink:0}
+.slbl{font-size:10px;color:#555;display:block;margin-bottom:4px;margin-top:10px;letter-spacing:.08em;text-transform:uppercase}
+#sidebar input[type=range]{padding:0;height:6px;accent-color:#4ade80;margin-bottom:8px}
+.bsrow{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.bsrow button{padding:4px 10px;font-size:15px;min-width:32px}
+.bsrow span{font-family:monospace;font-size:14px;color:#ccc;min-width:26px;text-align:center}
+.pbtns{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.pbtn{font-size:11px;padding:3px 7px}
+.pbtn.on{background:#1a3a2a;color:#4ade80;border-color:#4ade80}
+.sdiv{border:none;border-top:1px solid #222;margin:10px 0}
+
+#main{flex:1;overflow-y:auto;padding:10px;-webkit-overflow-scrolling:touch}
+#toolbar{background:#141414;border:1px solid #222;border-radius:8px;padding:8px 10px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+.tlbl{font-size:10px;color:#555;margin-right:4px;flex-shrink:0}
+.tpill{font-family:monospace;font-size:12px;padding:4px 8px;border-radius:5px;border:1px solid #2a2a2a;background:#141414;color:#aaa;touch-action:manipulation}
+.tpill:active{border-color:#60a5fa;color:#60a5fa}
+.hint{font-size:11px;color:#3a3a3a;margin-bottom:10px;line-height:1.7}
+.hint b{color:#555}
+
+.bar{background:#171717;border:1px solid #2a2a2a;border-radius:8px;padding:10px 8px 8px;margin-bottom:14px}
+.barhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:6px;flex-wrap:wrap}
+.barnum{font-size:10px;color:#555;font-family:monospace}
+.barctrl{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
+.barctrl button{padding:2px 6px;font-size:11px;min-height:26px}
+.barctrl .p{font-size:10px;padding:2px 4px}
+.barctrl .p.on{background:#1a3a2a;color:#4ade80;border-color:#4ade80}
+.barscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.strrow{display:flex;align-items:center;margin-bottom:3px;white-space:nowrap}
+.strlbl{width:20px;font-size:11px;color:#555;font-family:monospace;text-align:right;margin-right:5px;flex-shrink:0}
+.bl{font-family:monospace;color:#333;font-size:18px;line-height:32px;padding:0 2px;flex-shrink:0}
+
+.cell{display:inline-flex;align-items:center;justify-content:center;height:32px;min-width:34px;padding:0 5px;font-family:monospace;font-size:12px;white-space:nowrap;border-radius:5px;border:1px solid transparent;cursor:pointer;position:relative;touch-action:manipulation}
+.cell.sel{border-color:#555;background:#1e1e1e}
+.cell.ed{border-color:#60a5fa;background:#0a1520}
+.edash{color:#2d2d2d}
+.tn{color:#e0e0e0}.th{color:#4ade80}.tp{color:#f97316}.tb{color:#facc15}.tr2{color:#facc15}.ts{color:#a78bfa}.tv{color:#38bdf8}.tt{color:#f472b6}.tx{color:#555}.tsym{color:#94a3b8}
+.cellinput{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#0a1520;border:none;outline:none;color:#60a5fa;font-family:monospace;font-size:13px;text-align:center;padding:0 3px;z-index:5;-webkit-user-select:text;user-select:text}
+.donerow{position:absolute;top:-34px;left:50%;transform:translateX(-50%);display:flex;gap:4px;z-index:20;white-space:nowrap}
+.donebtn{padding:4px 12px;font-size:12px;background:#1a3a2a;color:#4ade80;border:1px solid #4ade80;border-radius:5px;touch-action:manipulation}
+.cancelbtn{padding:4px 10px;font-size:12px;border-radius:5px;touch-action:manipulation}
+
+.addbarrow{display:flex;gap:7px;align-items:center;margin-top:4px}
+.addbarbtn{flex:1;padding:10px;font-size:13px;border:1px dashed #2a2a2a;border-radius:8px;background:transparent;color:#444}
+
+#prevtext{font-family:monospace;font-size:12px;line-height:2;white-space:pre;background:#111;padding:14px;border-radius:8px;border:1px solid #222;overflow-x:auto;max-height:calc(100dvh - 200px)}
+.prevacts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+.lgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.lcard{background:#171717;border:1px solid #2a2a2a;border-radius:8px;padding:14px}
+.lcard h3{font-size:13px;color:#ccc;margin-bottom:10px;font-weight:600}
+.lrow{display:flex;gap:10px;margin-bottom:5px;font-size:12px}
+.lcode{font-family:monospace;color:#4ade80;min-width:70px;flex-shrink:0}
+.ldesc{color:#666}
+
+.mcard{background:#171717;border:1px solid #2a2a2a;border-radius:8px;padding:16px;margin-bottom:12px;max-width:460px}
+.mcard h3{font-size:14px;color:#ccc;margin-bottom:8px;font-weight:600}
+.mstrs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.msbtn{padding:5px 11px;font-size:13px;font-family:monospace;border-radius:5px}
+.msbtn.on{background:#1a3a2a;color:#4ade80;border-color:#4ade80}
+.mnote{font-size:26px;font-family:monospace;font-weight:600;color:#4ade80;margin:6px 0 12px}
+.mfret{font-size:44px;font-family:monospace;font-weight:700;color:#60a5fa;margin:4px 0 12px}
+.mtip{font-size:11px;color:#444;line-height:1.5;margin-top:10px}
+
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#141414;border:1px solid #333;border-radius:12px;padding:22px;width:100%;max-width:360px}
+.modal h3{font-size:15px;color:#f87171;margin-bottom:8px;font-weight:600}
+.modal p{font-size:13px;color:#666;margin-bottom:18px}
+.modbtns{display:flex;gap:8px;justify-content:flex-end}
+
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#111;border:1px solid;border-radius:8px;padding:11px 22px;font-size:13px;z-index:9999;pointer-events:none;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const SK="tbfg_v7",AK="tbfg_auto_v7",STR=6,EMPTY="-";
+const TUNINGS={"Standard (EADGBe)":["E2","A2","D3","G3","B3","E4"],"Drop D":["D2","A2","D3","G3","B3","E4"],"Open G":["D2","G2","D3","G3","B3","D4"],"Open D":["D2","A2","D3","F#3","A3","D4"],"DADGAD":["D2","A2","D3","G3","A3","D4"],"Half Step Down":["Eb2","Ab2","Db3","Gb3","Bb3","Eb4"],"Full Step Down":["D2","G2","C3","F3","A3","D4"],"Open E":["E2","B2","E3","G#3","B3","E4"],"Custom":["E2","A2","D3","G3","B3","E4"]};
+const KEYS=["C","C#/Db","D","D#/Eb","E","F","F#/Gb","G","G#/Ab","A","A#/Bb","B"];
+const TSIGS=["2/4","3/4","4/4","5/4","6/4","6/8","7/8","9/8","12/8"];
+const NNAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const NFREQS={"E2":82.41,"A2":110,"D3":146.83,"G3":196,"B3":246.94,"E4":329.63,"D2":73.42,"G2":98,"C3":130.81,"F3":174.61,"A3":220,"D4":293.66,"Eb2":77.78,"Ab2":103.83,"Db3":138.59,"Gb3":185,"Bb3":233.08,"F#3":185,"G#3":207.65};
+const TECHS=[["h","h","Hammer-on 5h7"],["p","p","Pull-off 7p5"],["b","b","Bend 7b"],["b½","b½","Half bend"],["r","r","Release 7b9r"],["/","/","Slide up 5/7"],["\\","\\","Slide down 7\\5"],["~","~","Vibrato"],["t","t","Tap t12"],["x","x","Mute"],["◇","<>","Harmonic <12>"],["{}","{}","Pinch {7}"],["()","()","Ghost (5)"],["PM","PM","Palm mute"],["↓","↓","Downstroke"],["↑","↑","Upstroke"],["≈","≈","Tremolo"],["⌇","⌇","Rake"]];
+
+function mkBar(b){return{beats:b||8,strings:Array.from({length:STR},()=>Array(b||8).fill(EMPTY))};}
+function fresh(){return{title:"Untitled Tab",artist:"",key:"E",tuning:"Standard (EADGBe)",timeSig:"4/4",tempo:120,bars:[mkBar(8)]};}
+function ldSaves(){try{return JSON.parse(localStorage.getItem(SK)||"[]");}catch{return[];}}
+function wSaves(v){try{localStorage.setItem(SK,JSON.stringify(v));}catch{}}
+function ldAuto(){try{const d=localStorage.getItem(AK);return d?JSON.parse(d):null;}catch{return null;}}
+function wAuto(t){try{localStorage.setItem(AK,JSON.stringify({tab:t,ts:Date.now()}));}catch{}}
+function fmtD(ts){if(!ts)return"";const d=new Date(ts);return d.toLocaleDateString(undefined,{month:"short",day:"numeric"})+" "+d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});}
+
+function h(tag,props,...kids){
+  const e=document.createElement(tag);
+  if(props)Object.entries(props).forEach(([k,v])=>{
+    if(k==="cls")e.className=v;
+    else if(k==="sty")Object.assign(e.style,v);
+    else if(k.startsWith("on"))e.addEventListener(k.slice(2).toLowerCase(),v);
+    else if(v===true)e.setAttribute(k,"");
+    else if(v!==false&&v!=null)e.setAttribute(k,String(v));
+  });
+  kids.flat().forEach(c=>{if(c==null)return;e.appendChild(typeof c==="string"?document.createTextNode(c):c);});
+  return e;
+}
+
+function colourVal(v){
+  if(!v||v===EMPTY)return h("span",{cls:"edash"},"–");
+  const s=h("span",{sty:{fontFamily:"monospace"}});
+  let i=0;
+  while(i<v.length){
+    const c=v[i];
+    if(/\d/.test(c)){let n="";while(i<v.length&&/\d/.test(v[i]))n+=v[i++];s.appendChild(h("span",{cls:"tn"},n));}
+    else if(c==="h"){s.appendChild(h("span",{cls:"th"},"h"));i++;}
+    else if(c==="p"){s.appendChild(h("span",{cls:"tp"},"p"));i++;}
+    else if(c==="b"){let x="b";i++;if(v[i]==="½"){x+="½";i++;}s.appendChild(h("span",{cls:"tb"},x));}
+    else if(c==="r"){s.appendChild(h("span",{cls:"tr2"},"r"));i++;}
+    else if(c==="/"||c==="\\"){s.appendChild(h("span",{cls:"ts"},c));i++;}
+    else if(c==="~"){s.appendChild(h("span",{cls:"tv"},"~"));i++;}
+    else if(c==="t"){s.appendChild(h("span",{cls:"tt"},"t"));i++;}
+    else if(c==="x"){s.appendChild(h("span",{cls:"tx"},"x"));i++;}
+    else{s.appendChild(h("span",{cls:"tsym"},c));i++;}
+  }
+  return s;
+}
+
+function acorr(buf,sr){let r=0;for(let i=0;i<buf.length;i++)r+=buf[i]*buf[i];r=Math.sqrt(r/buf.length);if(r<0.01)return -1;let r1=0,r2=buf.length-1;for(let i=0;i<buf.length/2;i++){if(Math.abs(buf[i])<0.2){r1=i;break;}}for(let i=1;i<buf.length/2;i++){if(Math.abs(buf[buf.length-i])<0.2){r2=buf.length-i;break;}}const tb=buf.slice(r1,r2);const c=new Array(tb.length).fill(0);for(let i=0;i<tb.length;i++)for(let j=0;j<tb.length-i;j++)c[i]+=tb[j]*tb[j+i];let d=0;while(c[d]>c[d+1])d++;let mx=-1,mp=-1;for(let i=d;i<tb.length;i++)if(c[i]>mx){mx=c[i];mp=i;}let T=mp;const x1=c[T-1],x2=c[T],x3=c[T+1];if(x1!==undefined&&x3!==undefined)T=T+(x3-x1)/(2*(2*x2-x3-x1));return sr/T;}
+function f2note(f){if(!f||f<40)return null;const m=Math.round(12*Math.log2(f/440)+69);return`${NNAMES[((m%12)+12)%12]}${Math.floor(m/12)-1}`;}
+function f2fret(f,of){if(!f||!of)return null;const s=Math.round(12*Math.log2(f/of));return(s>=0&&s<=24)?s:null;}
+
+// ── state ──────────────────────────────────────────────────────────────────
+const auto=ldAuto();
+let S={
+  tab:auto?.tab||fresh(), saves:ldSaves(), curId:null,
+  sec:"editor", sel:{bar:0,str:0,beat:0},
+  sideOpen:window.innerWidth>600, nbBeats:8,
+  showSave:false, showFiles:false, unsaved:false,
+  micOn:false, micSt:"idle", detNote:null, detFret:null, selStr:0,
+  confDel:null, renId:null, renName:"",
+  custTuning:[...TUNINGS["Standard (EADGBe)"]],
+  editCell:null,
+};
+let aCtx=null,anl=null,mStream=null,rafId=null,asT=null;
+
+function tn(){return S.tab.tuning==="Custom"?S.custTuning:(TUNINGS[S.tab.tuning]||TUNINGS["Standard (EADGBe)"]);}
+function gv(b,s,bt){return S.tab.bars[b]?.strings[s]?.[bt]??EMPTY;}
+function sv(b,s,bt,v){S.tab.bars[b].strings[s][bt]=v;sched();render();}
+function sched(){S.unsaved=true;clearTimeout(asT);asT=setTimeout(()=>wAuto(S.tab),1500);}
+
+let toastEl=null,toastT=null;
+function toast(msg,color="#4ade80",bc="#4ade80"){
+  if(toastEl){toastEl.remove();clearTimeout(toastT);}
+  toastEl=h("div",{cls:"toast",sty:{color,borderColor:bc}},msg);
+  document.body.appendChild(toastEl);
+  toastT=setTimeout(()=>{toastEl?.remove();toastEl=null;},2400);
+}
+
+// ── file ops ───────────────────────────────────────────────────────────────
+// Save current tab as .tabforge.json to device
+function saveToDevice(){
+  const name=(S.tab.title||"untitled").replace(/[^a-zA-Z0-9_\- ]/g,"_");
+  const data=JSON.stringify(S.tab,null,2);
+  const blob=new Blob([data],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=`${name}.tabforge.json`; a.click();
+  URL.revokeObjectURL(url);
+  toast("💾 Saved to device — check Downloads");
+}
+
+// Save all browser saves as one backup bundle
+function saveAllToDevice(){
+  if(!S.saves.length){toast("No saves to export","#f87171","#f87171");return;}
+  const data=JSON.stringify({version:1,exported:new Date().toISOString(),tabs:S.saves},null,2);
+  const blob=new Blob([data],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=`TabForge-backup-${Date.now()}.json`; a.click();
+  URL.revokeObjectURL(url);
+  toast(`📦 Exported ${S.saves.length} tabs`);
+}
+
+// Export current tab as plain text
+function saveAsTxt(){
+  const name=(S.tab.title||"untitled").replace(/[^a-zA-Z0-9_\- ]/g,"_");
+  const blob=new Blob([tabTxt()],{type:"text/plain"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=`${name}.txt`; a.click();
+  URL.revokeObjectURL(url);
+  toast("📄 Saved as .txt");
+}
+
+// Load a .tabforge.json or backup bundle from device
+function loadFromDevice(e){
+  const f=e.target.files?.[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      // single tab file
+      if(data.bars&&data.title!==undefined){
+        S.tab=data; S.curId=null; S.unsaved=true;
+        toast(`📂 Loaded "${data.title}"`,"#a78bfa","#a78bfa");
+        S.showFiles=false; render();
+      }
+      // backup bundle (all tabs)
+      else if(data.version===1&&Array.isArray(data.tabs)){
+        const existing=new Set(S.saves.map(s=>s.id));
+        let added=0;
+        data.tabs.forEach(entry=>{
+          if(!existing.has(entry.id)){S.saves.unshift(entry);added++;}
+        });
+        wSaves(S.saves);
+        toast(`📦 Restored ${added} tab${added!==1?"s":""}`,added?"#a78bfa":"#888",added?"#a78bfa":"#555");
+        S.showFiles=false; render();
+      }
+      else{toast("Unrecognised file format","#f87171","#f87171");}
+    }catch{toast("Couldn't read file","#f87171","#f87171");}
+  };
+  r.readAsText(f); e.target.value="";
+}
+
+// ── tab/bar ops ────────────────────────────────────────────────────────────
+function resizeBar(bi,nb){
+  if(nb<1||nb>64)return;
+  const bar=S.tab.bars[bi]; bar.beats=nb;
+  bar.strings=bar.strings.map(s=>nb>s.length?[...s,...Array(nb-s.length).fill(EMPTY)]:s.slice(0,nb));
+  if(S.sel.bar===bi&&S.sel.beat>=nb)S.sel.beat=nb-1;
+  sched();render();
+}
+function addBar(){S.tab.bars.push(mkBar(S.nbBeats));sched();render();}
+function rmBar(bi){if(S.tab.bars.length<=1)return;S.tab.bars.splice(bi,1);if(S.sel.bar>=S.tab.bars.length)S.sel.bar=S.tab.bars.length-1;sched();render();}
+function extBar(bi){resizeBar(bi,S.tab.bars[bi].beats+4);}
+
+function savTab(oid=null){
+  const id=oid||`s_${Date.now()}`;
+  const entry={id,name:S.tab.title||"Untitled",tab:JSON.parse(JSON.stringify(S.tab)),ts:Date.now()};
+  S.saves=[entry,...S.saves.filter(s=>s.id!==id)]; wSaves(S.saves);
+  S.curId=id; S.unsaved=false;
+  toast(`✓ Saved "${entry.name}"`); render();
+}
+function ldSave(entry){
+  S.tab=JSON.parse(JSON.stringify(entry.tab)); S.curId=entry.id;
+  S.unsaved=false; S.sel={bar:0,str:0,beat:0}; S.showSave=false;
+  toast(`Loaded "${entry.name}"`,"#60a5fa","#60a5fa"); render();
+}
+function delSave(id){
+  S.saves=S.saves.filter(s=>s.id!==id); wSaves(S.saves);
+  if(S.curId===id)S.curId=null; S.confDel=null;
+  toast("Deleted","#f87171","#f87171"); render();
+}
+function newTab(){
+  S.tab=fresh(); S.curId=null; S.unsaved=false;
+  S.sel={bar:0,str:0,beat:0}; S.showSave=false;
+  toast("New tab","#a78bfa","#a78bfa"); render();
+}
+
+function tabTxt(){
+  const t=S.tab,tu=tn(),L=[];
+  L.push(`${t.title}${t.artist?" — "+t.artist:""}`);
+  L.push(`Key: ${t.key} | ${t.tuning} | ${t.timeSig} | ♩=${t.tempo}`);
+  L.push(`Tuning: ${tu.join(" ")}`); L.push("");
+  t.bars.forEach((bar,bi)=>{
+    const cw=Array.from({length:bar.beats},(_,ci)=>Math.max(2,...Array.from({length:STR},(_,si)=>(bar.strings[si][ci]===EMPTY?"--":bar.strings[si][ci]).length)));
+    L.push(`[Bar ${bi+1}]`);
+    [...tu].reverse().forEach((note,ri)=>{
+      const si=STR-1-ri,sn=note.replace(/\d/,"").padEnd(2);
+      const cs=bar.strings[si].map((c,ci)=>{const v=c===EMPTY?"--":c;return v.padEnd(cw[ci],"-");});
+      L.push(`${sn}|${cs.join("-")}|`);
+    });
+    L.push("");
+  });
+  return L.join("\n");
+}
+
+// ── mic ────────────────────────────────────────────────────────────────────
+async function startMic(){
+  try{
+    S.micSt="requesting"; render();
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    mStream=stream; aCtx=new(window.AudioContext||window.webkitAudioContext)();
+    anl=aCtx.createAnalyser(); anl.fftSize=2048;
+    aCtx.createMediaStreamSource(stream).connect(anl);
+    S.micOn=true; S.micSt="active"; render();
+    const buf=new Float32Array(2048);
+    const det=()=>{
+      anl.getFloatTimeDomainData(buf);
+      const fr=acorr(buf,aCtx.sampleRate);
+      if(fr>0){
+        const n=f2note(fr); S.detNote=n?`${n} · ${Math.round(fr)}Hz`:null;
+        const of=NFREQS[tn()[S.selStr]]; S.detFret=of?f2fret(fr,of):null;
+        const nd=document.getElementById("mn"),fd=document.getElementById("mf"),ab=document.getElementById("mab");
+        if(nd)nd.textContent=S.detNote||"— listening —";
+        if(fd)fd.textContent=S.detFret!==null?String(S.detFret):"—";
+        if(ab){ab.style.display=S.detFret!==null?"inline-block":"none";ab.textContent=`↓ Apply fret ${S.detFret}`;}
+      }
+      rafId=requestAnimationFrame(det);
+    }; det();
+  }catch{S.micSt="denied"; S.micOn=false; render();}
+}
+function stopMic(){
+  if(rafId)cancelAnimationFrame(rafId);
+  if(mStream)mStream.getTracks().forEach(t=>t.stop());
+  if(aCtx)aCtx.close();
+  S.micOn=false; S.micSt="idle"; S.detNote=null; S.detFret=null; render();
+}
+
+// ── toolbar insert ─────────────────────────────────────────────────────────
+function tins(chars){
+  if(S.editCell){
+    const inp=document.querySelector(".cellinput");
+    if(inp){const st=inp.selectionStart,en=inp.selectionEnd,v=inp.value;inp.value=v.slice(0,st)+chars+v.slice(en);inp.selectionStart=inp.selectionEnd=st+chars.length;inp.focus();}
+  } else {
+    const {bar,str,beat}=S.sel,cur=gv(bar,str,beat);
+    sv(bar,str,beat,cur===EMPTY?chars:cur+chars);
+  }
+}
+
+// ── cell editing ───────────────────────────────────────────────────────────
+function openEdit(bar,str,beat){
+  S.editCell={bar,str,beat}; render();
+  setTimeout(()=>{const inp=document.querySelector(".cellinput");if(inp){inp.focus();const l=inp.value.length;inp.setSelectionRange(l,l);}},40);
+}
+function commitEdit(bar,str,beat,val){
+  sv(bar,str,beat,val.trim()||EMPTY); S.editCell=null; render();
+}
+function cancelEdit(){S.editCell=null; render();}
+
+// ── keyboard ───────────────────────────────────────────────────────────────
+document.addEventListener("keydown",e=>{
+  if(S.sec!=="editor")return;
+  if(e.target.classList.contains("cellinput"))return;
+  const inInp=e.target.tagName==="INPUT"||e.target.tagName==="SELECT";
+  if(inInp)return;
+  const {bar,str,beat}=S.sel,bb=S.tab.bars[bar]?.beats||8;
+  if(e.key==="ArrowRight"){e.preventDefault();if(beat<bb-1)S.sel.beat++;else if(bar<S.tab.bars.length-1){S.sel.bar++;S.sel.beat=0;}else{extBar(bar);S.sel.beat++;}render();}
+  else if(e.key==="ArrowLeft"){e.preventDefault();if(beat>0)S.sel.beat--;else if(bar>0){S.sel.bar--;S.sel.beat=S.tab.bars[S.sel.bar]?.beats-1||7;}render();}
+  else if(e.key==="ArrowUp"){e.preventDefault();if(str<STR-1)S.sel.str++;render();}
+  else if(e.key==="ArrowDown"){e.preventDefault();if(str>0)S.sel.str--;render();}
+  else if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();sv(S.sel.bar,S.sel.str,S.sel.beat,EMPTY);}
+  else if((e.ctrlKey||e.metaKey)&&e.key==="s"){e.preventDefault();savTab(S.curId);}
+  else if(e.key==="Enter"||e.key===" "){e.preventDefault();openEdit(S.sel.bar,S.sel.str,S.sel.beat);}
+  else if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
+    S.editCell={bar:S.sel.bar,str:S.sel.str,beat:S.sel.beat}; render();
+    setTimeout(()=>{const inp=document.querySelector(".cellinput");if(inp){inp.value=e.key;inp.focus();inp.setSelectionRange(1,1);}},40);
+  }
+});
+
+// ── render ─────────────────────────────────────────────────────────────────
+function render(){
+  const main_el=document.getElementById("main");
+  const savedScroll=main_el?main_el.scrollTop:0;
+  const app=document.getElementById("app"); app.innerHTML="";
+  const t=S.tab,tu=tn();
+
+  // topbar
+  app.appendChild(h("div",{id:"topbar"},
+    h("h1",{},"🎸 TabForge"),
+    S.unsaved?h("span",{cls:"unsaved"},"unsaved"):null,
+    h("div",{cls:"nav-btns"},
+      ...["editor","preview","legend","mic"].map(s=>
+        h("button",{cls:"nbtn"+(S.sec===s?" on":""),onclick:()=>{S.sec=s;render();}},s==="mic"?"🎙":s[0].toUpperCase()+s.slice(1))
+      )
+    ),
+    h("div",{cls:"top-r"},
+      h("button",{cls:"sbtn",onclick:()=>savTab(S.curId),title:"Ctrl+S"},"💾 Save"),
+      h("button",{cls:"tbtn"+(S.showFiles?" on":""),onclick:()=>{S.showFiles=!S.showFiles;S.showSave=false;render();},sty:{background:S.showFiles?"#1a3a2a":"",color:S.showFiles?"#4ade80":"",borderColor:S.showFiles?"#4ade80":""}},"📁 Files"),
+      h("button",{cls:"tbtn"+(S.showSave?" on":""),onclick:()=>{S.showSave=!S.showSave;S.showFiles=false;render();}},"📂 "+S.saves.length+" Saves"),
+      h("button",{onclick:()=>{S.sideOpen=!S.sideOpen;render();}},S.sideOpen?"◀":"▶"),
+    )
+  ));
+
+  // ── file panel ──
+  if(S.showFiles){
+    const fp=h("div",{id:"filepanel"},h("h3",{},"📁 FILE MANAGER — Save & Load to your device"));
+    const grid=h("div",{cls:"file-grid"});
+
+    // save current tab to device
+    const c1=h("div",{cls:"file-card"},
+      h("h4",{},"Save current tab"),
+      h("p",{},"Download this tab as a .json file to your device. Load it back anytime."),
+      h("button",{cls:"green",onclick:saveToDevice},"💾 Save tab to device"),
+      h("button",{cls:"green",sty:{marginTop:"4px"},onclick:saveAsTxt},"📄 Save as .txt")
+    );
+
+    // load from device
+    const c2=h("div",{cls:"file-card"},
+      h("h4",{},"Load from device"),
+      h("p",{},"Open a .tabforge.json file saved from this app, or a backup bundle."),
+      (()=>{
+        const lb=h("button",{cls:"blue",sty:{width:"100%"}},"📂 Load file from device");
+        const fi=h("input",{type:"file",accept:".json",sty:{display:"none"},onchange:loadFromDevice});
+        lb.onclick=()=>fi.click();
+        const wrap=h("div",{});wrap.appendChild(lb);wrap.appendChild(fi);return wrap;
+      })()
+    );
+
+    // backup all saves
+    const c3=h("div",{cls:"file-card"},
+      h("h4",{},"Backup all saves"),
+      h("p",{},`Export all ${S.saves.length} saved tabs as one backup bundle. Restore on any device.`),
+      h("button",{cls:"purple",onclick:saveAllToDevice},"📦 Export all tabs"),
+    );
+
+    grid.appendChild(c1); grid.appendChild(c2); grid.appendChild(c3);
+    fp.appendChild(grid);
+    fp.appendChild(h("div",{cls:"file-note"},
+      "⚠️ Browser saves (📂 Saves) can be cleared by the browser. ",
+      "Use 💾 Save tab to device regularly to keep your work safe. ",
+      "Files saved to device live in your Downloads folder — move them somewhere permanent."
+    ));
+    app.appendChild(fp);
+  }
+
+  // ── save panel ──
+  if(S.showSave){
+    const sp=h("div",{id:"savepanel"},
+      h("div",{cls:"sptop"},
+        h("strong",{sty:{fontSize:"13px",color:"#ccc"}},"Browser Saves"),
+        h("button",{sty:{fontSize:"11px",padding:"3px 9px",color:"#a78bfa",borderColor:"#a78bfa",background:"#1a1525"},onclick:newTab},"+ New"),
+        h("span",{sty:{fontSize:"10px",color:"#444"}},"Auto-saves every 1.5s · may be cleared by browser")
+      )
+    );
+    if(!S.saves.length)sp.appendChild(h("div",{sty:{fontSize:"12px",color:"#444",padding:"4px 0"}},"No saves yet. Hit 💾 Save to store a tab."));
+    S.saves.forEach(s=>{
+      const row=h("div",{cls:"srow"+(S.curId===s.id?" cur":"")});
+      if(S.renId===s.id){
+        const rr=h("div",{cls:"renrow"});
+        const ri=h("input",{type:"text",value:S.renName,oninput:e=>S.renName=e.target.value,onkeydown:e=>{if(e.key==="Enter"){S.saves=S.saves.map(sv=>sv.id===S.renId?{...sv,name:S.renName}:sv);wSaves(S.saves);S.renId=null;render();}if(e.key==="Escape"){S.renId=null;render();}}});
+        rr.appendChild(ri);
+        rr.appendChild(h("button",{sty:{fontSize:"11px",padding:"2px 7px",color:"#4ade80",borderColor:"#4ade80"},onclick:()=>{S.saves=S.saves.map(sv=>sv.id===S.renId?{...sv,name:S.renName}:sv);wSaves(S.saves);S.renId=null;render();}},"✓"));
+        rr.appendChild(h("button",{sty:{fontSize:"11px",padding:"2px 7px"},onclick:()=>{S.renId=null;render();}},"✕"));
+        row.appendChild(rr);
+      } else {
+        row.appendChild(h("div",{cls:"sinfo",onclick:()=>ldSave(s)},
+          h("div",{cls:"sname"},s.name),
+          h("div",{cls:"smeta"},`${fmtD(s.ts)} · ${s.tab.bars.length} bars · ${s.tab.tuning}`)
+        ));
+        row.appendChild(h("div",{cls:"sacts"},
+          h("button",{title:"Overwrite with current tab",onclick:e=>{e.stopPropagation();savTab(s.id);}},"↑"),
+          h("button",{onclick:e=>{e.stopPropagation();S.renId=s.id;S.renName=s.name;render();}},"✎"),
+          h("button",{sty:{color:"#f87171"},onclick:e=>{e.stopPropagation();S.confDel=s;render();}},"🗑")
+        ));
+      }
+      sp.appendChild(row);
+    });
+    app.appendChild(sp);
+  }
+
+  // body
+  const body=h("div",{id:"body"});
+
+  // sidebar
+  if(S.sideOpen){
+    const sb=h("div",{id:"sidebar"});
+    const add=(lbl,el2)=>{sb.appendChild(h("span",{cls:"slbl"},lbl));sb.appendChild(el2);};
+    add("TITLE",h("input",{type:"text",value:t.title,oninput:e=>{S.tab.title=e.target.value;sched();}}));
+    add("ARTIST",h("input",{type:"text",value:t.artist,placeholder:"Artist",oninput:e=>{S.tab.artist=e.target.value;sched();}}));
+    const ks=h("select",{onchange:e=>{S.tab.key=e.target.value;sched();render();}});
+    KEYS.forEach(k=>ks.appendChild(h("option",{value:k,...(t.key===k?{selected:true}:{})},k)));add("KEY",ks);
+    const ts=h("select",{onchange:e=>{S.tab.tuning=e.target.value;sched();render();}});
+    Object.keys(TUNINGS).forEach(k=>ts.appendChild(h("option",{value:k,...(t.tuning===k?{selected:true}:{})},k)));add("TUNING",ts);
+    if(t.tuning==="Custom"){
+      sb.appendChild(h("span",{cls:"slbl"},"CUSTOM (low→high)"));
+      S.custTuning.forEach((n,i)=>sb.appendChild(h("input",{type:"text",value:n,sty:{marginBottom:"3px",fontSize:"13px"},oninput:e=>{S.custTuning[i]=e.target.value;sched();render();}})));
+    }
+    const tsg=h("select",{onchange:e=>{S.tab.timeSig=e.target.value;sched();}});
+    TSIGS.forEach(s=>tsg.appendChild(h("option",{value:s,...(t.timeSig===s?{selected:true}:{})},s)));add("TIME SIG",tsg);
+    sb.appendChild(h("span",{cls:"slbl"},`TEMPO: ${t.tempo} BPM`));
+    sb.appendChild(h("input",{type:"range",min:"40",max:"280",value:String(t.tempo),oninput:e=>{S.tab.tempo=Number(e.target.value);sched();render();}}));
+    sb.appendChild(h("hr",{cls:"sdiv"}));
+    sb.appendChild(h("span",{cls:"slbl"},"NEW BAR SIZE"));
+    sb.appendChild(h("div",{cls:"bsrow"},
+      h("button",{onclick:()=>{S.nbBeats=Math.max(1,S.nbBeats-1);render();}},"−"),
+      h("span",{},String(S.nbBeats)),
+      h("button",{onclick:()=>{S.nbBeats=Math.min(64,S.nbBeats+1);render();}},"+")
+    ));
+    const pb=h("div",{cls:"pbtns"});
+    [4,6,8,12,16].forEach(n=>pb.appendChild(h("button",{cls:"pbtn"+(S.nbBeats===n?" on":""),onclick:()=>{S.nbBeats=n;render();}},String(n))));
+    sb.appendChild(pb);
+    sb.appendChild(h("button",{sty:{width:"100%",padding:"7px",fontSize:"12px",marginBottom:"4px"},onclick:addBar},`+ Add Bar (${S.nbBeats})`));
+    sb.appendChild(h("hr",{cls:"sdiv"}));
+    sb.appendChild(h("button",{sty:{width:"100%",padding:"7px",fontSize:"12px",background:"#1a3a2a",color:"#4ade80",border:"1px solid #4ade80",borderRadius:"6px",marginBottom:"4px"},onclick:()=>savTab(S.curId)},"💾 Save"));
+    sb.appendChild(h("button",{sty:{width:"100%",padding:"7px",fontSize:"12px",marginBottom:"4px"},onclick:()=>{S.showFiles=!S.showFiles;S.showSave=false;render();}},"📁 Save to Device"));
+    sb.appendChild(h("button",{sty:{width:"100%",padding:"7px",fontSize:"12px"},onclick:()=>{S.showSave=!S.showSave;S.showFiles=false;render();}},`📂 Saves (${S.saves.length})`));
+    sb.appendChild(h("div",{sty:{fontSize:"10px",color:"#444",marginTop:"8px"}},`Bars: ${t.bars.length}`));
+    body.appendChild(sb);
+  }
+
+  const main=h("div",{id:"main"});
+
+  // ── EDITOR ──
+  if(S.sec==="editor"){
+    const tlb=h("div",{id:"toolbar"},h("span",{cls:"tlbl"},"INSERT →"));
+    TECHS.forEach(([lbl,chars,tip])=>tlb.appendChild(h("button",{cls:"tpill",title:tip,onclick:()=>tins(chars)},lbl)));
+    main.appendChild(tlb);
+    main.appendChild(h("div",{cls:"hint"},
+      h("b",{},"Tap once")," to select · ",h("b",{},"tap again")," to edit · type ",
+      h("span",{sty:{fontFamily:"monospace",color:"#4ade80"}},"5h7"),
+      " ",h("span",{sty:{fontFamily:"monospace",color:"#facc15"}},"7b9r"),
+      " ",h("span",{sty:{fontFamily:"monospace",color:"#a78bfa"}},"5/7"),
+      " all in one slot · ",h("b",{},"✓ done")," or Enter to confirm"
+    ));
+
+    t.bars.forEach((bar,bi)=>{
+      const barEl=h("div",{cls:"bar"},
+        h("div",{cls:"barhdr"},
+          h("span",{cls:"barnum"},`BAR ${bi+1}`),
+          h("div",{cls:"barctrl"},
+            h("button",{onclick:()=>resizeBar(bi,bar.beats-1)},"−"),
+            h("span",{sty:{fontFamily:"monospace",fontSize:"11px",color:"#aaa",minWidth:"18px",textAlign:"center"}},String(bar.beats)),
+            h("button",{onclick:()=>resizeBar(bi,bar.beats+1)},"+"),
+            h("button",{onclick:()=>resizeBar(bi,bar.beats+4)},"+4"),
+            ...[4,8,12,16].map(n=>h("button",{cls:"p"+(bar.beats===n?" on":""),onclick:()=>resizeBar(bi,n)},String(n))),
+            h("button",{sty:{color:"#f87171"},onclick:()=>rmBar(bi)},"✕")
+          )
+        )
+      );
+      const sc=h("div",{cls:"barscroll"});
+      for(let rawSi=0;rawSi<STR;rawSi++){
+        const si=STR-1-rawSi,sn=(tu[si]||"?").replace(/\d/,"");
+        const row=h("div",{cls:"strrow"},h("span",{cls:"strlbl"},sn),h("span",{cls:"bl"},"|"));
+        bar.strings[si].forEach((cv,beat)=>{
+          const isSel=S.sel.bar===bi&&S.sel.str===si&&S.sel.beat===beat;
+          const isEd=S.editCell&&S.editCell.bar===bi&&S.editCell.str===si&&S.editCell.beat===beat;
+          const cw=Math.max(34,(isEd?Math.max(cv===EMPTY?1:cv.length,1):cv===EMPTY?1:cv.length)*10+14);
+          const cellEl=h("div",{
+            cls:"cell"+(isSel?" sel":"")+(isEd?" ed":""),
+            sty:{minWidth:cw+"px"},
+            onclick:()=>{if(!isSel){S.sel={bar:bi,str:si,beat};render();}else if(!isEd){openEdit(bi,si,beat);}}
+          });
+          if(isEd){
+            const iv=cv===EMPTY?"":cv;
+            const inp=h("input",{type:"text",cls:"cellinput",value:iv,sty:{width:Math.max(40,iv.length*10+18)+"px"}});
+            inp.addEventListener("input",e=>{inp.style.width=Math.max(40,e.target.value.length*10+18)+"px";});
+            inp.addEventListener("keydown",e=>{
+              e.stopPropagation();
+              if(e.key==="Enter"){e.preventDefault();commitEdit(bi,si,beat,inp.value);const bb2=S.tab.bars[bi]?.beats||8;if(beat<bb2-1)S.sel={bar:bi,str:si,beat:beat+1};else if(bi<S.tab.bars.length-1)S.sel={bar:bi+1,str:si,beat:0};render();setTimeout(()=>{const ni=document.querySelector(".cellinput");if(ni)ni.focus();},40);}
+              if(e.key==="Escape"){e.preventDefault();cancelEdit();}
+            });
+            inp.addEventListener("blur",()=>setTimeout(()=>{if(S.editCell&&S.editCell.bar===bi&&S.editCell.str===si&&S.editCell.beat===beat)commitEdit(bi,si,beat,inp.value);},200));
+            const dr=h("div",{cls:"donerow"},
+              h("button",{cls:"donebtn",onmousedown:e=>{e.preventDefault();commitEdit(bi,si,beat,inp.value);},ontouchend:e=>{e.preventDefault();commitEdit(bi,si,beat,inp.value);}},"✓ done"),
+              h("button",{cls:"cancelbtn",onmousedown:e=>{e.preventDefault();cancelEdit();},ontouchend:e=>{e.preventDefault();cancelEdit();}},"✕")
+            );
+            cellEl.appendChild(dr); cellEl.appendChild(inp);
+          } else {
+            cellEl.appendChild(colourVal(cv));
+          }
+          row.appendChild(cellEl);
+        });
+        row.appendChild(h("span",{cls:"bl"},"|"));
+        sc.appendChild(row);
+      }
+      barEl.appendChild(sc); main.appendChild(barEl);
+    });
+
+    main.appendChild(h("div",{cls:"addbarrow"},
+      h("button",{cls:"addbarbtn",onclick:addBar},`+ Add Bar (${S.nbBeats} beats)`),
+      h("div",{sty:{display:"flex",gap:"4px"}},...[4,8,12,16].map(n=>h("button",{cls:"pbtn"+(S.nbBeats===n?" on":""),onclick:()=>{S.nbBeats=n;render();}},String(n))))
+    ));
+  }
+
+  // ── PREVIEW ──
+  else if(S.sec==="preview"){
+    main.appendChild(h("div",{id:"prevtext"},tabTxt()));
+    main.appendChild(h("div",{cls:"prevacts"},
+      h("button",{onclick:()=>{navigator.clipboard?.writeText(tabTxt());toast("Copied!");}}, "Copy"),
+      h("button",{onclick:saveAsTxt},"↓ Save .txt"),
+      h("button",{onclick:saveToDevice},"↓ Save .json")
+    ));
+  }
+
+  // ── LEGEND ──
+  else if(S.sec==="legend"){
+    const lg=h("div",{cls:"lgrid"});
+    [{title:"One cell — full phrase",rows:[["5","Single fret"],["5h7","Hammer-on 5→7"],["7p5","Pull-off 7→5"],["7b9","Bend to pitch of 9"],["7b9r7","Bend then release"],["7b½","Half-step bend"],["5/7","Slide up"],["7\\5","Slide down"],["5h7p5","Hammer then pull"]]},
+     {title:"More techniques",rows:[["7~","Vibrato"],["t12","Tap fret 12"],["x","Muted note"],["<12>","Natural harmonic"],["{7}","Pinch harmonic"],["(5)","Ghost note"],["PM","Palm mute"]]},
+     {title:"Picking",rows:[["↓","Downstroke"],["↑","Upstroke"],["≈","Tremolo pick"],["⌇","Rake"]]},
+     {title:"Saving your work",rows:[["💾 Save","Saves to browser (may clear)"],["📁 Files → Save tab","Downloads .json to device"],["📁 Files → Load","Opens a saved .json file"],["📁 Export all","One file with all your tabs"],["Ctrl+S","Quick save to browser"]]},
+    ].forEach(c=>{
+      const card=h("div",{cls:"lcard"},h("h3",{},c.title));
+      c.rows.forEach(([s,d])=>card.appendChild(h("div",{cls:"lrow"},h("span",{cls:"lcode"},s),h("span",{cls:"ldesc"},d))));
+      lg.appendChild(card);
+    });
+    main.appendChild(lg);
+  }
+
+  // ── MIC ──
+  else if(S.sec==="mic"){
+    main.appendChild(h("div",{cls:"mcard"},
+      h("h3",{},"Mic pitch detection"),
+      h("p",{sty:{fontSize:"12px",color:"#555",lineHeight:"1.7",marginBottom:"12px"}},"Play a single note. Identifies pitch and suggests a fret. Single clean notes only."),
+      h("div",{sty:{fontSize:"11px",color:"#555",marginBottom:"8px"}},"Detect on string:"),
+      h("div",{cls:"mstrs"},...[...tu].reverse().map((note,ri)=>{const si=STR-1-ri;return h("button",{cls:"msbtn"+(S.selStr===si?" on":""),onclick:()=>{S.selStr=si;render();}},note.replace(/\d/,""));})),
+      S.micOn
+        ?h("button",{sty:{padding:"8px 18px",fontSize:"13px",color:"#f87171",borderColor:"#f87171"},onclick:stopMic},"⬛ Stop")
+        :h("button",{sty:{padding:"8px 18px",fontSize:"13px"},onclick:startMic},"🎙 Start listening"),
+      S.micSt==="denied"?h("div",{sty:{marginTop:"10px",fontSize:"12px",color:"#f87171"}},"Mic access denied."):null
+    ));
+    if(S.micOn){
+      main.appendChild(h("div",{cls:"mcard"},
+        h("div",{sty:{fontSize:"10px",color:"#555",marginBottom:"4px"}},"DETECTED NOTE"),
+        h("div",{id:"mn",cls:"mnote"},S.detNote||"— listening —"),
+        h("div",{sty:{fontSize:"10px",color:"#555",marginBottom:"4px"}},`FRET · ${(tu[S.selStr]||"").replace(/\d/,"")} string`),
+        h("div",{id:"mf",cls:"mfret"},S.detFret!==null?String(S.detFret):"—"),
+        h("button",{id:"mab",sty:{display:S.detFret!==null?"inline-block":"none",padding:"8px 16px",fontSize:"13px",background:"#1a2a3a",color:"#60a5fa",border:"1px solid #60a5fa",borderRadius:"6px"},onclick:()=>{if(S.detFret!==null){sv(S.sel.bar,S.sel.str,S.sel.beat,String(S.detFret));toast(`Fret ${S.detFret} applied`);}}},`↓ Apply fret ${S.detFret}`),
+        h("div",{cls:"mtip"},"Clean notes, close mic, no background noise. Let it ring.")
+      ));
+    }
+  }
+
+  body.appendChild(main);
+  app.appendChild(body);
+  // restore scroll position after DOM is rebuilt
+  requestAnimationFrame(()=>{
+    const m=document.getElementById("main");
+    if(m&&savedScroll)m.scrollTop=savedScroll;
+  });
+
+  // confirm delete modal
+  if(S.confDel){
+    const ov=h("div",{cls:"overlay",onclick:()=>{S.confDel=null;render();}});
+    const mod=h("div",{cls:"modal",onclick:e=>e.stopPropagation()},
+      h("h3",{},`Delete "${S.confDel.name}"?`),
+      h("p",{},"This removes it from browser saves. If you haven't saved to device, it's gone."),
+      h("div",{cls:"modbtns"},
+        h("button",{onclick:()=>{S.confDel=null;render();}},"Cancel"),
+        h("button",{sty:{color:"#f87171",borderColor:"#f87171",background:"#1a0f0f"},onclick:()=>delSave(S.confDel.id)},"Delete")
+      )
+    );
+    ov.appendChild(mod); app.appendChild(ov);
+  }
+}
+
+render();
+</script>
+</body>
+</html>
